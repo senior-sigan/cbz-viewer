@@ -102,6 +102,7 @@ func (g *Game) DrawManga(screen *ebiten.Image) {
 
 	opt := ebiten.DrawImageOptions{}
 	opt.GeoM.Scale(scale, scale)
+	opt.Filter = ebiten.FilterLinear
 	screen.DrawImage(page, &opt)
 }
 
