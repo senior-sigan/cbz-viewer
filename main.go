@@ -32,10 +32,21 @@ func clampi(v, left, right int) int {
 }
 
 type Game struct {
-	curentPosY  float64
-	currentPage int
-	webtoon     bool
-	pages       []*ebiten.Image
+	curentPosY   float64
+	currentPage  int
+	webtoon      bool
+	canvasHeight float64
+	pages        []*ebiten.Image
+}
+
+func (g *Game) scrollY(dy float64) {
+	g.curentPosY += dy
+	if g.curentPosY > 0 {
+		g.curentPosY = 0
+	}
+	if g.canvasHeight-float64(screenHeight) < -g.curentPosY {
+		g.curentPosY = -(g.canvasHeight - float64(screenHeight))
+	}
 }
 
 func (g *Game) Update() error {
@@ -50,14 +61,14 @@ func (g *Game) Update() error {
 	}
 
 	if g.webtoon && ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
-		g.curentPosY = g.curentPosY + scrollSpeed
+		g.scrollY(scrollSpeed)
 	}
 	if g.webtoon && ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
-		g.curentPosY = g.curentPosY - scrollSpeed
+		g.scrollY(-scrollSpeed)
 	}
 	if g.webtoon {
 		_, dy := ebiten.Wheel()
-		g.curentPosY += dy * scrollSpeed * 2
+		g.scrollY(dy * scrollSpeed * 2)
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyS) {
 		page := g.pages[g.currentPage]
@@ -78,14 +89,18 @@ func (g *Game) DrawWebtoon(screen *ebiten.Image) {
 		}
 		size := page.Bounds().Size()
 		scale := float64(screenWidth) / float64(size.X) // by width
+		posY := g.curentPosY + y
+		y += float64(size.Y) * scale
+		if posY < -float64(size.Y)*scale || posY > float64(screenHeight) {
+			continue
+		}
 		opt := ebiten.DrawImageOptions{}
-		opt.GeoM.Translate(0, g.curentPosY+y)
 		opt.GeoM.Scale(scale, scale)
+		opt.GeoM.Translate(0, posY)
 		opt.Filter = ebiten.FilterLinear
 		screen.DrawImage(page, &opt)
-
-		y += float64(size.Y)
 	}
+	g.canvasHeight = y
 }
 
 func (g *Game) DrawManga(screen *ebiten.Image) {
@@ -160,7 +175,7 @@ func NewGame(filepath string) *Game {
 			if f.FileInfo().IsDir() {
 				continue
 			}
-			log.Printf("[DBG] file: %s", f.Name)
+			log.Printf("[DBG] [%d/%d] file: %s", i+1, n, f.Name)
 			rc, err := f.Open()
 			if err != nil {
 				log.Printf("[ERR] failed to open entry %s: %v", f.Name, err)
